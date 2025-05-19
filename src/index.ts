@@ -11,6 +11,30 @@ import {
 import axios from "axios";
 import crypto from 'crypto';
 
+// Define interfaces for FreshRSS API responses
+interface FreshRSSItem {
+  id: string;
+  feed_id: number;
+  title: string;
+  author?: string;
+  html: string;
+  url: string;
+  is_saved: number;
+  is_read: number;
+  created_on_time: number;
+}
+
+interface FreshRSSResponse {
+  api_version: number;
+  auth: number;
+  last_refreshed_on_time: number;
+  total_items?: number;
+  items?: FreshRSSItem[];
+  feeds?: any[];
+  feeds_groups?: any[];
+  groups?: any[];
+}
+
 // FreshRSS API client class
 class FreshRSSClient {
   private apiUrl: string;
@@ -71,21 +95,33 @@ class FreshRSSClient {
   }
 
   // Get unread items
-  async getUnreadItems(limit: number = 50) {
-    return this.request('', 'GET', { 
-      items: '',
-      with_ids: '0',
-      unread_only: '1',
-      max: limit
+  async getUnreadItems(): Promise<FreshRSSResponse> {
+    // Get all items and filter them on our side
+    const response = await this.request<FreshRSSResponse>('', 'GET', {
+      items: ''
     });
+
+    // Filter to only include unread items
+    if (response.items && Array.isArray(response.items)) {
+      response.items = response.items.filter(item => item.is_read === 0);
+
+      // Update total_items count
+      if (response.total_items !== undefined) {
+        response.total_items = response.items.length;
+      }
+    }
+
+    return response;
   }
 
   // Get feed items
-  async getFeedItems(feedId: string, limit: number = 50) {
-    return this.request('', 'GET', {
+  async getFeedItems(feedId: number | string): Promise<FreshRSSResponse> {
+    // Ensure feedId is a number as required by the Fever API
+    const numericFeedId = typeof feedId === 'string' ? parseInt(feedId, 10) : feedId;
+
+    return this.request<FreshRSSResponse>('', 'GET', {
       items: '',
-      feed_id: feedId,
-      max: limit
+      feed_id: numericFeedId
     });
   }
 
@@ -173,12 +209,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       description: "Get unread items",
       inputSchema: {
         type: "object",
-        properties: {
-          limit: {
-            type: "number",
-            description: "Maximum number of items to return (default: 50)",
-          },
-        },
+        properties: {},
       },
     },
     {
@@ -190,10 +221,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           feed_id: {
             type: "string",
             description: "Feed ID",
-          },
-          limit: {
-            type: "number",
-            description: "Maximum number of items to return (default: 50)",
           },
         },
         required: ["feed_id"],
@@ -286,23 +313,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "get_unread": {
-        const { limit } = request.params.arguments as { limit?: number };
-        const items = await client.getUnreadItems(limit);
+        const response = await client.getUnreadItems();
         return {
           content: [{
             type: "text",
-            text: JSON.stringify(items, null, 2),
+            text: JSON.stringify(response, null, 2),
           }],
         };
       }
 
       case "get_feed_items": {
-        const { feed_id, limit } = request.params.arguments as { feed_id: string; limit?: number };
-        const items = await client.getFeedItems(feed_id, limit);
+        const { feed_id } = request.params.arguments as { feed_id: string };
+        const response = await client.getFeedItems(feed_id);
+
+        // Filter items to only include those from the requested feed
+        if (response.items && Array.isArray(response.items)) {
+          const numericFeedId = parseInt(feed_id, 10);
+          response.items = response.items.filter((item: FreshRSSItem) => item.feed_id === numericFeedId);
+
+          // Update total_items count to reflect the filtered items
+          if (response.total_items !== undefined) {
+            response.total_items = response.items.length;
+          }
+        }
+
         return {
           content: [{
             type: "text",
-            text: JSON.stringify(items, null, 2),
+            text: JSON.stringify(response, null, 2),
           }],
         };
       }
