@@ -15,12 +15,19 @@ This TypeScript-based MCP server allows AI assistants to interact with your Fres
 
 - `list_feeds` - List all feed subscriptions
 - `get_feed_groups` - Get feed groups
-- `get_unread` - Get unread items
-- `get_feed_items` - Get items from a specific feed
+- `get_unread` - Get unread items (summary-only)
+- `get_feed_item_summaries` - Get item summaries from a specific feed (ID, title, URL, timestamp only)
+- `get_feed_items` - Get items from a specific feed (full content only when necessary)
 - `mark_item_read` - Mark an item as read
 - `mark_item_unread` - Mark an item as unread
 - `mark_feed_read` - Mark all items in a feed as read
 - `get_items` - Get specific items by their IDs
+
+### Token Efficiency
+
+This server now implements token-efficient feed item retrieval:
+- Summary-only methods (`get_unread` and `get_feed_item_summaries`) return only ID, title, URL, and timestamp
+- Full content methods retain existing behavior for when complete content is required
 
 ## Requirements
 
@@ -43,6 +50,12 @@ For development with auto-rebuild:
 ```bash
 npm run watch
 ```
+
+### FreshRSSClient Methods
+
+- `getUnreadItemSummaries()` - Returns only ID, title, URL, and timestamp for unread items
+- `getFeedItemSummaries()` - Returns only ID, title, URL, and timestamp for feed items
+- `getFeedItems()` - Returns full items (backward compatibility maintained)
 
 ### Environment Variables
 
