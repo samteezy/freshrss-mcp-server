@@ -220,7 +220,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: "list_feeds",
-      description: "List all feed subscriptions",
+      description: "List all available RSS feeds.",
       inputSchema: {
         type: "object",
         properties: {},
@@ -228,7 +228,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_feed_groups",
-      description: "Get feed groups",
+      description: "List FreshRSS feed groups/categories.",
       inputSchema: {
         type: "object",
         properties: {},
@@ -236,7 +236,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_unread",
-      description: "Get unread items summaries (ID, title, URL, timestamp). Avoids full HTML.",
+      description: "Get unread items' summary info (ID, title, URL, timestamp). Avoids full content.",
       inputSchema: {
         type: "object",
         properties: {},
@@ -244,7 +244,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_feed_items",
-      description: "Get full feed items (includes HTML). Use ONLY when necessary.",
+      description: "Get items from a feed with FULL content. Use ONLY when necessary.",
       inputSchema: {
         type: "object",
         properties: {
@@ -258,7 +258,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_feed_item_summaries",
-      description: "Get feed item summaries (ID, title, URL, timestamp). Use before requesting full content.",
+      description: "Get specific item summary info (ID, title, URL, timestamp).",
       inputSchema: {
         type: "object",
         properties: {
@@ -314,7 +314,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_items",
-      description: "Get specific items by their IDs",
+      description: "Get specific items' content by their IDs",
       inputSchema: {
         type: "object",
         properties: {
