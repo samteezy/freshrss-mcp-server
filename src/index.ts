@@ -24,12 +24,30 @@ interface FreshRSSItem {
   created_on_time: number;
 }
 
+interface FreshRSSItemSummary {
+  id: string;
+  title: string;
+  url: string;
+  created_on_time: number;
+}
+
 interface FreshRSSResponse {
   api_version: number;
   auth: number;
   last_refreshed_on_time: number;
   total_items?: number;
   items?: FreshRSSItem[];
+  feeds?: any[];
+  feeds_groups?: any[];
+  groups?: any[];
+}
+
+interface FreshRSSResponseSummary {
+  api_version: number;
+  auth: number;
+  last_refreshed_on_time: number;
+  total_items?: number;
+  items?: FreshRSSItemSummary[];
   feeds?: any[];
   feeds_groups?: any[];
   groups?: any[];
@@ -94,24 +112,36 @@ class FreshRSSClient {
     return this.request('', 'GET', { groups: '' });
   }
 
-  // Get unread items
-  async getUnreadItems(): Promise<FreshRSSResponse> {
-    // Get all items and filter them on our side
-    const response = await this.request<FreshRSSResponse>('', 'GET', {
-      items: ''
-    });
-
-    // Filter to only include unread items
+  // Get unread items summaries
+  async getUnreadItemSummaries(): Promise<FreshRSSResponseSummary> {
+    const response = await this.request<FreshRSSResponse>('', 'GET', { items: '' });
     if (response.items && Array.isArray(response.items)) {
-      response.items = response.items.filter(item => item.is_read === 0);
-
-      // Update total_items count
-      if (response.total_items !== undefined) {
-        response.total_items = response.items.length;
-      }
+      const summaries = response.items
+        .filter(item => item.is_read === 0)
+        .map(item => ({
+          id: item.id,
+          title: item.title,
+          url: item.url,
+          created_on_time: item.created_on_time
+        }));
+      return { ...response, items: summaries, total_items: summaries.length };
     }
+    return response as unknown as FreshRSSResponseSummary;
+  }
 
-    return response;
+  // Get feed item summaries
+  async getFeedItemSummaries(feedId: number | string): Promise<FreshRSSResponseSummary> {
+    const response = await this.getFeedItems(feedId); // Uses existing API call
+    if (response.items && Array.isArray(response.items)) {
+      const summaries = response.items.map(item => ({
+        id: item.id,
+        title: item.title,
+        url: item.url,
+        created_on_time: item.created_on_time
+      }));
+      return { ...response, items: summaries, total_items: summaries.length };
+    }
+    return response as unknown as FreshRSSResponseSummary;
   }
 
   // Get feed items
@@ -206,7 +236,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_unread",
-      description: "Get unread items",
+      description: "Get unread items summaries (ID, title, URL, timestamp). Avoids full HTML.",
       inputSchema: {
         type: "object",
         properties: {},
@@ -214,7 +244,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_feed_items",
-      description: "Get items from a specific feed",
+      description: "Get full feed items (includes HTML). Use ONLY when necessary.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          feed_id: {
+            type: "string",
+            description: "Feed ID",
+          },
+        },
+        required: ["feed_id"],
+      },
+    },
+    {
+      name: "get_feed_item_summaries",
+      description: "Get feed item summaries (ID, title, URL, timestamp). Use before requesting full content.",
       inputSchema: {
         type: "object",
         properties: {
@@ -313,7 +357,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "get_unread": {
-        const response = await client.getUnreadItems();
+        const response = await client.getUnreadItemSummaries();
         return {
           content: [{
             type: "text",
@@ -325,18 +369,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "get_feed_items": {
         const { feed_id } = request.params.arguments as { feed_id: string };
         const response = await client.getFeedItems(feed_id);
-
-        // Filter items to only include those from the requested feed
-        if (response.items && Array.isArray(response.items)) {
-          const numericFeedId = parseInt(feed_id, 10);
-          response.items = response.items.filter((item: FreshRSSItem) => item.feed_id === numericFeedId);
-
-          // Update total_items count to reflect the filtered items
-          if (response.total_items !== undefined) {
-            response.total_items = response.items.length;
-          }
-        }
-
         return {
           content: [{
             type: "text",
@@ -374,6 +406,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: "text",
             text: `Successfully marked all items in feed ${feed_id} as read`,
+          }],
+        };
+      }
+
+      case "get_feed_item_summaries": {
+        const { feed_id } = request.params.arguments as { feed_id: string };
+        const response = await client.getFeedItemSummaries(feed_id);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(response, null, 2),
           }],
         };
       }
